@@ -1,0 +1,19 @@
+[Unit]
+Description=Keyboard Backlight Control Daemon
+After=multi-user.target graphical-session.target
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/backlight-ctl daemon
+ExecReload=/bin/kill -USR1 $MAINPID
+Restart=always
+RestartSec=3
+User=root
+Environment=HOME=/root
+
+# Automatically reload config when changed
+ExecStartPost=/bin/bash -c 'inotifywait -m /home/*/.config/backlight-control.json -e modify --format "%%w%%f" | while read file; do /bin/kill -USR1 $MAINPID; done &'
+
+[Install]
+WantedBy=multi-user.target graphical-session.target

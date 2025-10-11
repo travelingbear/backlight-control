@@ -1,0 +1,134 @@
+.TH BACKLIGHT-CTL 1 "October 2024" "backlight-ctl 1.0.0" "User Commands"
+.SH NAME
+backlight-ctl \- keyboard backlight control daemon and utility
+.SH SYNOPSIS
+.B backlight-ctl
+.I COMMAND
+.RI [ ARGS ]
+.SH DESCRIPTION
+.B backlight-ctl
+is a utility for controlling keyboard backlight on laptops with automatic activity detection. It can run as a daemon to automatically manage backlight based on keyboard and touchpad activity, with different timeouts for battery and AC power.
+.SH COMMANDS
+.TP
+.B daemon [--debug]
+Run as background daemon. Use --debug for verbose output.
+.TP
+.BI "set " LEVEL
+Set backlight level immediately. LEVEL must be 0 (off), 1 (low), or 2 (high).
+.TP
+.B get
+Display current backlight level.
+.TP
+.B status
+Show detailed status including power source, timeouts, and current settings.
+.TP
+.B enable
+Enable automatic backlight control.
+.TP
+.B disable
+Disable automatic backlight control.
+.TP
+.BI "config " KEY " " VALUE
+Configure daemon settings. Valid keys:
+.RS
+.TP
+.B battery_timeout
+Timeout in seconds when on battery power (5-300).
+.TP
+.B ac_timeout
+Timeout in seconds when on AC power (10-600).
+.TP
+.B ac_default_level
+Default backlight level on AC power (0-2).
+.TP
+.B battery_default_level
+Default backlight level on battery power (0-2).
+.RE
+.SH FEATURES
+.TP
+.B Activity Detection
+Monitors laptop keyboard and touchpad activity via i8042 interrupts. External USB devices are ignored.
+.TP
+.B Power-Aware Timeouts
+Uses different timeout values for battery and AC power to optimize battery life.
+.TP
+.B Gradual Dimming
+On AC power with level 2, gradually dims from 2→1→0 over the timeout period.
+.TP
+.B Configuration Persistence
+Settings are saved to ~/.config/backlight-control.conf and automatically reloaded.
+.SH GUI TOOLS
+.TP
+.B backlight-config
+Zenity-based configuration wizard for setting timeouts and default levels.
+.TP
+.B backlight-control-panel
+GUI control panel for manual backlight control and service management.
+.SH FILES
+.TP
+.I ~/.config/backlight-control.conf
+User configuration file
+.TP
+.I /etc/backlight-control.conf
+System-wide configuration file
+.TP
+.I /sys/class/leds/tpacpi::kbd_backlight/brightness
+Kernel interface for backlight control (ThinkPad)
+.TP
+.I /usr/share/applications/backlight-control.desktop
+Desktop entry for GUI access (optional)
+.SH SYSTEMD SERVICE
+The daemon is typically run as a systemd service:
+.PP
+.nf
+sudo systemctl enable backlight-control
+sudo systemctl start backlight-control
+.fi
+.PP
+The service automatically starts on boot and reloads configuration when changed.
+.SH EXAMPLES
+.TP
+Set backlight to maximum:
+.B backlight-ctl set 2
+.TP
+Configure 45-second timeout on battery:
+.B backlight-ctl config battery_timeout 45
+.TP
+Run daemon with debug output:
+.B backlight-ctl daemon --debug
+.TP
+Check current status:
+.B backlight-ctl status
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+Invalid arguments or configuration error
+.SH SIGNALS
+When running as daemon:
+.TP
+.B SIGUSR1
+Reload configuration from file
+.TP
+.B SIGTERM, SIGINT
+Graceful shutdown
+.SH REQUIREMENTS
+.TP
+.B Hardware
+ThinkPad or compatible laptop with keyboard backlight
+.TP
+.B Permissions
+Root access required for sysfs writes, or user in 'video' group with appropriate udev rules
+.TP
+.B Kernel
+Linux with i8042 keyboard controller support
+.SH AUTHOR
+Francisco Fernandes (travelingbear)
+.br
+GitHub: https://github.com/travelingbear/backlight-control
+.SH SEE ALSO
+.BR systemctl (1),
+.BR udev (7),
+.BR systemd.service (5)

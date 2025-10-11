@@ -1,0 +1,103 @@
+#!/bin/bash
+
+# Backlight Control Configuration Wizard
+
+BACKLIGHT_CTL="backlight-ctl"
+
+# Check if service is running
+if ! systemctl is-active --quiet backlight-control; then
+    zenity --warning --text="Backlight service is not running.\n\nTo start it: sudo systemctl start backlight-control\nTo enable on boot: sudo systemctl enable backlight-control"
+fi
+
+# Check if zenity is available
+if ! command -v zenity &> /dev/null; then
+    echo "Zenity not found. Install with: sudo apt install zenity"
+    exit 1
+fi
+
+# Get current configuration
+STATUS_OUTPUT=$($BACKLIGHT_CTL status)
+BATTERY_TIMEOUT=$(echo "$STATUS_OUTPUT" | grep "Battery Timeout" | sed 's/.*: \([0-9]*\)s/\1/')
+AC_TIMEOUT=$(echo "$STATUS_OUTPUT" | grep "AC Timeout" | sed 's/.*: \([0-9]*\)s/\1/')
+AC_LEVEL=$(echo "$STATUS_OUTPUT" | grep "AC Default Level" | sed 's/.*: \([0-9]*\)/\1/')
+BATTERY_LEVEL=$(echo "$STATUS_OUTPUT" | grep "Battery Default Level" | sed 's/.*: \([0-9]*\)/\1/')
+AUTO_MODE=$(echo "$STATUS_OUTPUT" | grep "Auto Mode" | sed 's/.*: //' | tr -d ' ')
+ENABLED_STATUS=$(if [ "$AUTO_MODE" = "Enabled" ]; then echo "true"; else echo "false"; fi)
+
+# Main configuration dialog
+CONFIG=$(zenity --forms --title="Backlight Control Configuration" \
+    --text="Configure keyboard backlight settings\n\nCurrent values shown below:" \
+    --add-entry="Battery Timeout (seconds):$BATTERY_TIMEOUT" \
+    --add-entry="AC Timeout (seconds):$AC_TIMEOUT" \
+    --add-entry="AC Default Level (0-2):$AC_LEVEL" \
+    --add-entry="Battery Default Level (0-2):$BATTERY_LEVEL" \
+    --add-entry="Auto-backlight Enabled (true/false):$ENABLED_STATUS" \
+    --separator="|" \
+    --width=450 \
+    --height=400)
+
+if [ $? -eq 0 ]; then
+    # Debug: show raw config
+    echo "Raw CONFIG: '$CONFIG'"
+    
+    # Parse the results
+    IFS='|' read -r BATTERY_TIMEOUT AC_TIMEOUT AC_LEVEL BATTERY_LEVEL ENABLED <<< "$CONFIG"
+    
+    echo "Parsed: BT='$BATTERY_TIMEOUT' AC='$AC_TIMEOUT' ACL='$AC_LEVEL' BL='$BATTERY_LEVEL' EN='$ENABLED'"
+    
+    # Set default values if empty
+    BATTERY_TIMEOUT=${BATTERY_TIMEOUT:-30}
+    AC_TIMEOUT=${AC_TIMEOUT:-120}
+    AC_LEVEL=${AC_LEVEL:-2}
+    BATTERY_LEVEL=${BATTERY_LEVEL:-1}
+    ENABLED=${ENABLED:-true}
+    
+    # Debug: show what we got
+    echo "Parsed values: BATTERY_TIMEOUT='$BATTERY_TIMEOUT' AC_TIMEOUT='$AC_TIMEOUT'"
+    
+    # Validate inputs
+    if ! [[ "$BATTERY_TIMEOUT" =~ ^[0-9]+$ ]] || [ "$BATTERY_TIMEOUT" -lt 5 ] || [ "$BATTERY_TIMEOUT" -gt 300 ]; then
+        zenity --error --text="Battery timeout must be between 5 and 300 seconds (got: '$BATTERY_TIMEOUT')"
+        exit 1
+    fi
+    
+    if ! [[ "$AC_TIMEOUT" =~ ^[0-9]+$ ]] || [ "$AC_TIMEOUT" -lt 10 ] || [ "$AC_TIMEOUT" -gt 600 ]; then
+        zenity --error --text="AC timeout must be between 10 and 600 seconds (got: '$AC_TIMEOUT')"
+        exit 1
+    fi
+    
+    # Ensure levels are valid numbers
+    AC_LEVEL=${AC_LEVEL:-2}
+    BATTERY_LEVEL=${BATTERY_LEVEL:-1}
+    
+    if ! [[ "$AC_LEVEL" =~ ^[0-2]$ ]]; then
+        AC_LEVEL=2
+    fi
+    
+    if ! [[ "$BATTERY_LEVEL" =~ ^[0-2]$ ]]; then
+        BATTERY_LEVEL=1
+    fi
+    
+    # Apply configuration
+    $BACKLIGHT_CTL config battery_timeout $BATTERY_TIMEOUT
+    $BACKLIGHT_CTL config ac_timeout $AC_TIMEOUT
+    $BACKLIGHT_CTL config ac_default_level $AC_LEVEL
+    $BACKLIGHT_CTL config battery_default_level $BATTERY_LEVEL
+    
+    # Apply enable/disable setting
+    if [ "$ENABLED" = "true" ] || [ "$ENABLED" = "TRUE" ] || [ "$ENABLED" = "1" ]; then
+        $BACKLIGHT_CTL enable
+    else
+        $BACKLIGHT_CTL disable
+    fi
+    
+    # Show confirmation
+    zenity --info --title="Configuration Saved" \
+        --text="Settings applied successfully!\n\nBattery: ${BATTERY_TIMEOUT}s, Level ${BATTERY_LEVEL}\nAC: ${AC_TIMEOUT}s, Level ${AC_LEVEL}\nAuto-backlight: ${ENABLED}\n\nRestart daemon to apply changes."
+    
+    # Configuration saved, service will auto-reload
+    zenity --info --title="Configuration Saved" \
+        --text="Settings applied successfully!\n\nBattery: ${BATTERY_TIMEOUT}s, Level ${BATTERY_LEVEL}\nAC: ${AC_TIMEOUT}s, Level ${AC_LEVEL}\nAuto-backlight: ${ENABLED}\n\nThe service will automatically reload the new configuration."
+else
+    echo "Configuration cancelled"
+fi

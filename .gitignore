@@ -1,0 +1,34 @@
+# Compiled binaries
+backlight-ctl
+
+# Build artifacts
+*.o
+*.so
+*.a
+
+# Package build directories and files
+debian/
+*.deb
+*.rpm
+*.spec
+build-packages.sh
+deb-build/
+rpm-build/
+
+# Temporary and cache files
+*.tmp
+*.cache
+*~
+.DS_Store
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Log files
+*.log
+
+# Configuration files (user-specific)
+backlight-control.conf

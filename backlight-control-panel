@@ -1,0 +1,106 @@
+#!/bin/bash
+
+# Backlight Control Panel - Main GUI
+
+BACKLIGHT_CTL="./backlight-ctl"
+
+# Check if zenity is available
+if ! command -v zenity &> /dev/null; then
+    echo "Zenity not found. Install with: sudo apt install zenity"
+    exit 1
+fi
+
+while true; do
+    # Get current status
+    STATUS=$($BACKLIGHT_CTL status)
+    CURRENT_LEVEL=$(echo "$STATUS" | grep "Current Level" | sed 's/.*: //' | tr -d ' ')
+    POWER_SOURCE=$(echo "$STATUS" | grep "Power Source" | sed 's/.*: //' | tr -d ' ')
+    AUTO_MODE=$(echo "$STATUS" | grep "Auto Mode" | sed 's/.*: //' | tr -d ' ')
+    
+    # Main control panel
+    CHOICE=$(zenity --list --title="Backlight Control Panel" \
+        --text="Current: Level $CURRENT_LEVEL | $POWER_SOURCE | Auto: $AUTO_MODE" \
+        --column="Action" --column="Description" \
+        --width=500 --height=400 \
+        "Manual Control" "Set backlight level manually" \
+        "Configuration" "Configure timeouts and default levels" \
+        "Enable Auto" "Enable automatic backlight control" \
+        "Disable Auto" "Disable automatic backlight control" \
+        "Start Service" "Start backlight service" \
+        "Stop Service" "Stop backlight service" \
+        "Restart Service" "Restart backlight service" \
+        "Status" "Show detailed status" \
+        "Exit" "Close control panel"
+    
+    case "$CHOICE" in
+        "Manual Control")
+            LEVEL=$(zenity --list --title="Set Backlight Level" \
+                --text="Choose backlight level:" \
+                --column="Level" --column="Description" \
+                --width=300 --height=200 \
+                "0" "Off" \
+                "1" "Low" \
+                "2" "High")
+            
+            if [ $? -eq 0 ] && [ -n "$LEVEL" ]; then
+                $BACKLIGHT_CTL set $LEVEL
+                zenity --info --text="Backlight set to level $LEVEL"
+            fi
+            ;;
+            
+        "Configuration")
+            ./backlight-config
+            ;;
+            
+        "Enable Auto")
+            $BACKLIGHT_CTL enable
+            zenity --info --text="Auto-backlight enabled"
+            ;;
+            
+        "Disable Auto")
+            $BACKLIGHT_CTL disable
+            zenity --info --text="Auto-backlight disabled"
+            ;;
+            
+
+            
+        "Start Service")
+            if systemctl is-active --quiet backlight-control; then
+                zenity --info --text="Service is already running"
+            else
+                sudo systemctl start backlight-control
+                if systemctl is-active --quiet backlight-control; then
+                    zenity --info --text="Service started successfully"
+                else
+                    zenity --error --text="Failed to start service"
+                fi
+            fi
+            ;;
+            
+        "Stop Service")
+            if systemctl is-active --quiet backlight-control; then
+                sudo systemctl stop backlight-control
+                zenity --info --text="Service stopped"
+            else
+                zenity --info --text="Service is not running"
+            fi
+            ;;
+            
+        "Restart Service")
+            sudo systemctl restart backlight-control
+            if systemctl is-active --quiet backlight-control; then
+                zenity --info --text="Service restarted successfully"
+            else
+                zenity --error --text="Failed to restart service"
+            fi
+            ;;
+            
+        "Status")
+            zenity --info --title="Backlight Status" --text="$STATUS" --width=400
+            ;;
+            
+        "Exit"|"")
+            exit 0
+            ;;
+    esac
+done
