@@ -100,8 +100,15 @@ void mark_daemon_backlight_change() {
 void set_backlight_level(int level) {
     FILE *f = fopen(BACKLIGHT_PATH, "w");
     if (f) {
-        fprintf(f, "%d", level);
+        int result = fprintf(f, "%d", level);
         fclose(f);
+        if (debug_mode) {
+            printf("Write to %s: level=%d, result=%d\n", BACKLIGHT_PATH, level, result);
+        }
+    } else {
+        if (debug_mode) {
+            printf("Failed to open %s for writing\n", BACKLIGHT_PATH);
+        }
     }
     mark_daemon_backlight_change();
 }
@@ -126,29 +133,19 @@ int is_on_ac_power() {
 }
 
 unsigned long get_interrupt_activity() {
-    static FILE *f = NULL;
-    
-    // Keep file open for efficiency
-    if (!f) {
-        f = fopen("/proc/interrupts", "r");
-        if (!f) return 0;
-    }
-    
-    // Rewind to beginning
-    rewind(f);
+    FILE *f = fopen("/proc/interrupts", "r");
+    if (!f) return 0;
     
     char line[256];
     unsigned long total = 0;
     
     while (fgets(line, sizeof(line), f)) {
         if (strstr(line, "i8042")) {
-            // Optimized parsing - find first number after colon
             char *colon = strchr(line, ':');
             if (colon) {
                 char *ptr = colon + 1;
                 while (*ptr == ' ' || *ptr == '\t') ptr++;
                 
-                // Sum all CPU columns
                 while (*ptr && *ptr >= '0' && *ptr <= '9') {
                     total += strtoul(ptr, &ptr, 10);
                     while (*ptr == ' ' || *ptr == '\t') ptr++;
@@ -157,6 +154,7 @@ unsigned long get_interrupt_activity() {
         }
     }
     
+    fclose(f);
     return total;
 }
 
