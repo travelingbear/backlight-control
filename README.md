@@ -32,7 +32,7 @@ sudo tee /usr/share/applications/backlight-control.desktop > /dev/null << 'EOF'
 [Desktop Entry]
 Name=Backlight Control
 Comment=Keyboard backlight configuration
-Exec=backlight-config
+Exec=pkexec backlight-config
 Icon=preferences-desktop-keyboard
 Type=Application
 Categories=Settings;System;

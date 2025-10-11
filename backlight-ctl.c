@@ -15,7 +15,6 @@
 #define VERSION "1.0.0"
 #define BACKLIGHT_PATH "/sys/class/leds/tpacpi::kbd_backlight/brightness"
 #define CONFIG_PATH "/etc/backlight-control.conf"
-#define USER_CONFIG_PATH "/.config/backlight-control.conf"
 
 #define MAX_INPUT_DEVICES 32
 
@@ -43,41 +42,30 @@ static int cached_power_status = 0;
 static unsigned long last_interrupt_count = 0;
 
 void load_config() {
-    FILE *f;
-    char config_path[256];
-    
-    // Try user config first
-    snprintf(config_path, sizeof(config_path), "%s%s", getenv("HOME") ?: "", USER_CONFIG_PATH);
-    f = fopen(config_path, "r");
-    
-    if (!f) {
-        f = fopen(CONFIG_PATH, "r");
-    }
+    FILE *f = fopen(CONFIG_PATH, "r");
     
     if (f) {
         fscanf(f, "enabled=%d\nbattery_timeout=%d\nac_timeout=%d\nac_default_level=%d\nbattery_default_level=%d\n",
                &config.enabled, &config.battery_timeout, &config.ac_timeout, &config.ac_default_level, &config.battery_default_level);
         fclose(f);
+        if (debug_mode) printf("Loaded config from %s: enabled=%d\n", CONFIG_PATH, config.enabled);
+    } else {
+        if (debug_mode) printf("No config file found, using defaults\n");
     }
     
     auto_mode = config.enabled ? AUTO_ENABLED : AUTO_DISABLED;
 }
 
 void save_config() {
-    FILE *f;
-    char config_path[256];
-    char config_dir[256];
-    
-    snprintf(config_dir, sizeof(config_dir), "%s/.config", getenv("HOME") ?: "");
-    mkdir(config_dir, 0755);
-    
-    snprintf(config_path, sizeof(config_path), "%s%s", getenv("HOME") ?: "", USER_CONFIG_PATH);
-    f = fopen(config_path, "w");
+    FILE *f = fopen(CONFIG_PATH, "w");
     
     if (f) {
         fprintf(f, "enabled=%d\nbattery_timeout=%d\nac_timeout=%d\nac_default_level=%d\nbattery_default_level=%d\n",
                 config.enabled, config.battery_timeout, config.ac_timeout, config.ac_default_level, config.battery_default_level);
         fclose(f);
+        if (debug_mode) printf("Config saved to: %s\n", CONFIG_PATH);
+    } else {
+        if (debug_mode) printf("Failed to save config to: %s\n", CONFIG_PATH);
     }
 }
 
@@ -191,8 +179,8 @@ void daemon_loop() {
             if (debug_mode) printf("Configuration reloaded\n");
         }
         
-        if (auto_mode == AUTO_DISABLED) {
-            if (debug_mode) printf("Auto-mode disabled (0), sleeping...\n");
+        if (!config.enabled) {
+            if (debug_mode) printf("Auto-mode disabled (config.enabled=%d), sleeping...\n", config.enabled);
             sleep(5);
             continue;
         }
@@ -211,9 +199,9 @@ void daemon_loop() {
         if (debug_mode) {
             static time_t last_debug = 0;
             if (now - last_debug >= 5) {
-                printf("Activity: %lu (last: %lu), Power: %s, Timeout: %ds, Elapsed: %lds, Auto-mode: %d\n", 
+                printf("Activity: %lu (last: %lu), Power: %s, Timeout: %ds, Elapsed: %lds, config.enabled: %d\n", 
                        current_activity, last_interrupt_count, on_ac ? "AC" : "Battery", timeout, 
-                       now - last_activity_time, auto_mode);
+                       now - last_activity_time, config.enabled);
                 last_debug = now;
             }
         }
@@ -260,7 +248,7 @@ void print_status() {
     printf("  Current Level: %d\n", get_backlight_level());
     printf("  Power Source: %s\n", is_on_ac_power() ? "AC Power" : "Battery");
     printf("  Auto Mode: %s\n", 
-           auto_mode == AUTO_ENABLED ? "Enabled" : "Disabled");
+           config.enabled ? "Enabled" : "Disabled");
     printf("  Battery Timeout: %ds\n", config.battery_timeout);
     printf("  AC Timeout: %ds\n", config.ac_timeout);
     printf("  AC Default Level: %d\n", config.ac_default_level);
@@ -331,11 +319,15 @@ int main(int argc, char *argv[]) {
     else if (strcmp(argv[1], "enable") == 0) {
         config.enabled = 1;
         save_config();
+        system("pkill -USR1 backlight-ctl 2>/dev/null");
         printf("Auto-backlight enabled\n");
     }
     else if (strcmp(argv[1], "disable") == 0) {
+        printf("Before disable: config.enabled = %d\n", config.enabled);
         config.enabled = 0;
+        printf("After disable: config.enabled = %d\n", config.enabled);
         save_config();
+        system("pkill -USR1 backlight-ctl 2>/dev/null");
         printf("Auto-backlight disabled\n");
     }
 
