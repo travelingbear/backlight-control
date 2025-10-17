@@ -24,6 +24,7 @@ typedef struct {
     int ac_timeout;
     int ac_default_level;
     int battery_default_level;
+    int poll_interval_ms;
 } config_t;
 
 typedef enum {
@@ -31,7 +32,7 @@ typedef enum {
     AUTO_ENABLED = 1
 } auto_mode_t;
 
-static config_t config = {1, 30, 120, 2, 1};
+static config_t config = {1, 30, 120, 2, 1, 1000};
 static auto_mode_t auto_mode = AUTO_ENABLED;
 static int running = 1;
 static int debug_mode = 0;
@@ -45,8 +46,8 @@ void load_config() {
     FILE *f = fopen(CONFIG_PATH, "r");
     
     if (f) {
-        fscanf(f, "enabled=%d\nbattery_timeout=%d\nac_timeout=%d\nac_default_level=%d\nbattery_default_level=%d\n",
-               &config.enabled, &config.battery_timeout, &config.ac_timeout, &config.ac_default_level, &config.battery_default_level);
+        fscanf(f, "enabled=%d\nbattery_timeout=%d\nac_timeout=%d\nac_default_level=%d\nbattery_default_level=%d\npoll_interval_ms=%d\n",
+               &config.enabled, &config.battery_timeout, &config.ac_timeout, &config.ac_default_level, &config.battery_default_level, &config.poll_interval_ms);
         fclose(f);
         if (debug_mode) printf("Loaded config from %s: enabled=%d\n", CONFIG_PATH, config.enabled);
     } else {
@@ -60,8 +61,8 @@ void save_config() {
     FILE *f = fopen(CONFIG_PATH, "w");
     
     if (f) {
-        fprintf(f, "enabled=%d\nbattery_timeout=%d\nac_timeout=%d\nac_default_level=%d\nbattery_default_level=%d\n",
-                config.enabled, config.battery_timeout, config.ac_timeout, config.ac_default_level, config.battery_default_level);
+        fprintf(f, "enabled=%d\nbattery_timeout=%d\nac_timeout=%d\nac_default_level=%d\nbattery_default_level=%d\npoll_interval_ms=%d\n",
+                config.enabled, config.battery_timeout, config.ac_timeout, config.ac_default_level, config.battery_default_level, config.poll_interval_ms);
         fclose(f);
         if (debug_mode) printf("Config saved to: %s\n", CONFIG_PATH);
     } else {
@@ -235,7 +236,7 @@ void daemon_loop() {
             }
         }
         
-        sleep(1);
+        usleep(config.poll_interval_ms * 1000);
     }
     
     printf("Daemon stopping\n");
@@ -253,6 +254,7 @@ void print_status() {
     printf("  AC Timeout: %ds\n", config.ac_timeout);
     printf("  AC Default Level: %d\n", config.ac_default_level);
     printf("  Battery Default Level: %d\n", config.battery_default_level);
+    printf("  Poll Interval: %dms\n", config.poll_interval_ms);
 }
 
 void print_usage() {
@@ -264,7 +266,7 @@ void print_usage() {
     printf("  status              Show status\n");
     printf("  enable              Enable auto-backlight\n");
     printf("  disable             Disable auto-backlight\n");
-    printf("  config <key> <val>  Set config (battery_timeout, ac_timeout, ac_default_level, battery_default_level)\n");
+    printf("  config <key> <val>  Set config (battery_timeout, ac_timeout, ac_default_level, battery_default_level, poll_interval_ms)\n");
     printf("  --version           Show version information\n");
     printf("  --help              Show this help message\n");
 }
@@ -340,6 +342,14 @@ int main(int argc, char *argv[]) {
             config.ac_default_level = atoi(argv[3]);
         } else if (strcmp(argv[2], "battery_default_level") == 0) {
             config.battery_default_level = atoi(argv[3]);
+        } else if (strcmp(argv[2], "poll_interval_ms") == 0) {
+            int interval = atoi(argv[3]);
+            if (interval >= 100 && interval <= 10000) {
+                config.poll_interval_ms = interval;
+            } else {
+                printf("Poll interval must be between 100-10000ms\n");
+                return 1;
+            }
         } else {
             printf("Unknown config key: %s\n", argv[2]);
             return 1;

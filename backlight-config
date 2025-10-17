@@ -17,43 +17,38 @@ fi
 
 # Get current configuration
 STATUS_OUTPUT=$($BACKLIGHT_CTL status)
-BATTERY_TIMEOUT=$(echo "$STATUS_OUTPUT" | grep "Battery Timeout" | sed 's/.*: \([0-9]*\)s/\1/')
-AC_TIMEOUT=$(echo "$STATUS_OUTPUT" | grep "AC Timeout" | sed 's/.*: \([0-9]*\)s/\1/')
-AC_LEVEL=$(echo "$STATUS_OUTPUT" | grep "AC Default Level" | sed 's/.*: \([0-9]*\)/\1/')
-BATTERY_LEVEL=$(echo "$STATUS_OUTPUT" | grep "Battery Default Level" | sed 's/.*: \([0-9]*\)/\1/')
+CURRENT_BATTERY_TIMEOUT=$(echo "$STATUS_OUTPUT" | grep "Battery Timeout" | sed 's/.*: \([0-9]*\)s/\1/')
+CURRENT_AC_TIMEOUT=$(echo "$STATUS_OUTPUT" | grep "AC Timeout" | sed 's/.*: \([0-9]*\)s/\1/')
+CURRENT_AC_LEVEL=$(echo "$STATUS_OUTPUT" | grep "AC Default Level" | sed 's/.*: \([0-9]*\)/\1/')
+CURRENT_BATTERY_LEVEL=$(echo "$STATUS_OUTPUT" | grep "Battery Default Level" | sed 's/.*: \([0-9]*\)/\1/')
+CURRENT_POLL_INTERVAL=$(echo "$STATUS_OUTPUT" | grep "Poll Interval" | sed 's/.*: \([0-9]*\)ms/\1/')
 AUTO_MODE=$(echo "$STATUS_OUTPUT" | grep "Auto Mode" | sed 's/.*: //' | tr -d ' ')
-ENABLED_STATUS=$(if [ "$AUTO_MODE" = "Enabled" ]; then echo "true"; else echo "false"; fi)
+CURRENT_ENABLED=$(if [ "$AUTO_MODE" = "Enabled" ]; then echo "true"; else echo "false"; fi)
 
-# Main configuration dialog
+# Configuration form with current values pre-filled and defaults shown
 CONFIG=$(zenity --forms --title="Backlight Control Configuration" \
-    --text="Configure keyboard backlight settings\n\nCurrent values shown below:" \
-    --add-entry="Battery Timeout (seconds):$BATTERY_TIMEOUT" \
-    --add-entry="AC Timeout (seconds):$AC_TIMEOUT" \
-    --add-entry="AC Default Level (0-2):$AC_LEVEL" \
-    --add-entry="Battery Default Level (0-2):$BATTERY_LEVEL" \
-    --add-entry="Auto-backlight Enabled (true/false):$ENABLED_STATUS" \
+    --text="Configure keyboard backlight settings\nCurrent values are pre-filled in each field." \
+    --add-entry="Battery Timeout (5-300s, default: 30):$CURRENT_BATTERY_TIMEOUT" \
+    --add-entry="AC Timeout (10-600s, default: 120):$CURRENT_AC_TIMEOUT" \
+    --add-entry="AC Default Level (0-2, default: 2):$CURRENT_AC_LEVEL" \
+    --add-entry="Battery Default Level (0-2, default: 1):$CURRENT_BATTERY_LEVEL" \
+    --add-entry="Poll Interval (100-10000ms, default: 1000):$CURRENT_POLL_INTERVAL" \
+    --add-entry="Auto-backlight Enabled (true/false, default: true):$CURRENT_ENABLED" \
     --separator="|" \
-    --width=450 \
-    --height=400)
+    --width=550 \
+    --height=450)
 
 if [ $? -eq 0 ]; then
-    # Debug: show raw config
-    echo "Raw CONFIG: '$CONFIG'"
-    
     # Parse the results
-    IFS='|' read -r BATTERY_TIMEOUT AC_TIMEOUT AC_LEVEL BATTERY_LEVEL ENABLED <<< "$CONFIG"
+    IFS='|' read -r NEW_BATTERY_TIMEOUT NEW_AC_TIMEOUT NEW_AC_LEVEL NEW_BATTERY_LEVEL NEW_POLL_INTERVAL NEW_ENABLED <<< "$CONFIG"
     
-    echo "Parsed: BT='$BATTERY_TIMEOUT' AC='$AC_TIMEOUT' ACL='$AC_LEVEL' BL='$BATTERY_LEVEL' EN='$ENABLED'"
-    
-    # Set default values if empty
-    BATTERY_TIMEOUT=${BATTERY_TIMEOUT:-30}
-    AC_TIMEOUT=${AC_TIMEOUT:-120}
-    AC_LEVEL=${AC_LEVEL:-2}
-    BATTERY_LEVEL=${BATTERY_LEVEL:-1}
-    ENABLED=${ENABLED:-true}
-    
-    # Debug: show what we got
-    echo "Parsed values: BATTERY_TIMEOUT='$BATTERY_TIMEOUT' AC_TIMEOUT='$AC_TIMEOUT'"
+    # Use current values if fields are empty (preserve unchanged)
+    BATTERY_TIMEOUT=${NEW_BATTERY_TIMEOUT:-$CURRENT_BATTERY_TIMEOUT}
+    AC_TIMEOUT=${NEW_AC_TIMEOUT:-$CURRENT_AC_TIMEOUT}
+    AC_LEVEL=${NEW_AC_LEVEL:-$CURRENT_AC_LEVEL}
+    BATTERY_LEVEL=${NEW_BATTERY_LEVEL:-$CURRENT_BATTERY_LEVEL}
+    POLL_INTERVAL=${NEW_POLL_INTERVAL:-$CURRENT_POLL_INTERVAL}
+    ENABLED=${NEW_ENABLED:-$CURRENT_ENABLED}
     
     # Validate inputs
     if ! [[ "$BATTERY_TIMEOUT" =~ ^[0-9]+$ ]] || [ "$BATTERY_TIMEOUT" -lt 5 ] || [ "$BATTERY_TIMEOUT" -gt 300 ]; then
@@ -66,16 +61,24 @@ if [ $? -eq 0 ]; then
         exit 1
     fi
     
-    # Ensure levels are valid numbers
-    AC_LEVEL=${AC_LEVEL:-2}
-    BATTERY_LEVEL=${BATTERY_LEVEL:-1}
-    
     if ! [[ "$AC_LEVEL" =~ ^[0-2]$ ]]; then
-        AC_LEVEL=2
+        zenity --error --text="AC level must be 0, 1, or 2 (got: '$AC_LEVEL')"
+        exit 1
     fi
     
     if ! [[ "$BATTERY_LEVEL" =~ ^[0-2]$ ]]; then
-        BATTERY_LEVEL=1
+        zenity --error --text="Battery level must be 0, 1, or 2 (got: '$BATTERY_LEVEL')"
+        exit 1
+    fi
+    
+    if ! [[ "$POLL_INTERVAL" =~ ^[0-9]+$ ]] || [ "$POLL_INTERVAL" -lt 100 ] || [ "$POLL_INTERVAL" -gt 10000 ]; then
+        zenity --error --text="Poll interval must be between 100 and 10000ms (got: '$POLL_INTERVAL')"
+        exit 1
+    fi
+    
+    if ! [[ "$ENABLED" =~ ^(true|false|TRUE|FALSE|1|0)$ ]]; then
+        zenity --error --text="Enabled must be true or false (got: '$ENABLED')"
+        exit 1
     fi
     
     # Apply configuration
@@ -83,6 +86,7 @@ if [ $? -eq 0 ]; then
     $BACKLIGHT_CTL config ac_timeout $AC_TIMEOUT
     $BACKLIGHT_CTL config ac_default_level $AC_LEVEL
     $BACKLIGHT_CTL config battery_default_level $BATTERY_LEVEL
+    $BACKLIGHT_CTL config poll_interval_ms $POLL_INTERVAL
     
     # Apply enable/disable setting
     if [ "$ENABLED" = "true" ] || [ "$ENABLED" = "TRUE" ] || [ "$ENABLED" = "1" ]; then
@@ -91,13 +95,19 @@ if [ $? -eq 0 ]; then
         $BACKLIGHT_CTL disable
     fi
     
-    # Show confirmation
-    zenity --info --title="Configuration Saved" \
-        --text="Settings applied successfully!\n\nBattery: ${BATTERY_TIMEOUT}s, Level ${BATTERY_LEVEL}\nAC: ${AC_TIMEOUT}s, Level ${AC_LEVEL}\nAuto-backlight: ${ENABLED}\n\nRestart daemon to apply changes."
-    
-    # Configuration saved, service will auto-reload
-    zenity --info --title="Configuration Saved" \
-        --text="Settings applied successfully!\n\nBattery: ${BATTERY_TIMEOUT}s, Level ${BATTERY_LEVEL}\nAC: ${AC_TIMEOUT}s, Level ${AC_LEVEL}\nAuto-backlight: ${ENABLED}\n\nThe service will automatically reload the new configuration."
+    # Restart daemon and show single confirmation
+    if systemctl is-active --quiet backlight-control; then
+        sudo systemctl restart backlight-control
+        if [ $? -eq 0 ]; then
+            zenity --info --title="Configuration Applied" \
+                --text="Settings applied and daemon restarted successfully!\n\nBattery: ${BATTERY_TIMEOUT}s, Level ${BATTERY_LEVEL}\nAC: ${AC_TIMEOUT}s, Level ${AC_LEVEL}\nPoll Interval: ${POLL_INTERVAL}ms\nAuto-backlight: ${ENABLED}"
+        else
+            zenity --error --text="Settings saved but failed to restart daemon. Please restart manually."
+        fi
+    else
+        zenity --info --title="Configuration Saved" \
+            --text="Settings saved successfully!\n\nBattery: ${BATTERY_TIMEOUT}s, Level ${BATTERY_LEVEL}\nAC: ${AC_TIMEOUT}s, Level ${AC_LEVEL}\nPoll Interval: ${POLL_INTERVAL}ms\nAuto-backlight: ${ENABLED}\n\nStart the service to apply changes."
+    fi
 else
     echo "Configuration cancelled"
 fi
