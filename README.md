@@ -1,6 +1,6 @@
 # Keyboard Backlight Control
 
-**Version 1.0.0**
+**Version 1.1.0**
 
 A lightweight, efficient daemon for automatic keyboard backlight control on Linux laptops. Automatically manages backlight based on keyboard and touchpad activity with power-aware timeouts.
 
@@ -19,10 +19,31 @@ A lightweight, efficient daemon for automatic keyboard backlight control on Linu
 ```bash
 git clone https://github.com/travelingbear/backlight-control.git
 cd backlight-control
+./install-complete.sh
+```
+
+That's it! The service and status bar will be installed and start automatically.
+
+### Service Only Install
+
+For service without status bar:
+```bash
 ./install-service.sh
 ```
 
-That's it! The service will start automatically and run on every boot.
+### Status Bar Integration
+
+The status bar shows:
+- ⌨A (green) - Auto mode enabled
+- ⌨M (red) - Manual mode
+
+Click for menu options:
+- Toggle auto/manual mode
+- Open configuration
+- View status
+
+**GNOME with Argos extension**: Automatically appears in top bar
+**Other systems**: Use `/usr/local/bin/backlight-status-bar.sh`
 
 ### Optional: Desktop Integration
 
@@ -105,7 +126,10 @@ journalctl -u backlight-control -f         # View logs
 - `backlight-control.service` - Systemd service
 - `backlight-config` - GUI configuration tool
 - `backlight-control-panel` - GUI control panel
-- `install-service.sh` - Installation script
+- `backlight-status-bar.sh` - Status bar indicator script
+- `install-service.sh` - Service-only installation
+- `install-complete.sh` - Complete installation with status bar
+- `create-release.sh` - Release packaging script
 - `Makefile` - Build system
 
 ## Building from Source
@@ -115,6 +139,14 @@ make clean
 make
 sudo make install
 ```
+
+## Creating Releases
+
+```bash
+./create-release.sh
+```
+
+Creates distributable packages in `releases/` directory with both `.tar.gz` and `.zip` formats.
 
 ## Uninstall
 

@@ -13,8 +13,10 @@ install: $(TARGET)
 	sudo chmod +x /usr/local/bin/$(TARGET)
 	sudo cp backlight-config /usr/local/bin/
 	sudo cp backlight-control-panel /usr/local/bin/
+	sudo cp backlight-status-bar.sh /usr/local/bin/
 	sudo chmod +x /usr/local/bin/backlight-config
 	sudo chmod +x /usr/local/bin/backlight-control-panel
+	sudo chmod +x /usr/local/bin/backlight-status-bar.sh
 	sudo cp backlight-ctl.1 /usr/share/man/man1/
 	sudo mandb -q
 
@@ -25,16 +27,20 @@ service: install
 	@echo "Service installed. Start with: sudo systemctl start backlight-control"
 
 full-install:
-	./install-service.sh
+	./install-complete.sh
 
 uninstall:
 	sudo systemctl stop backlight-control 2>/dev/null || true
 	sudo systemctl disable backlight-control 2>/dev/null || true
 	sudo rm -f /etc/systemd/system/backlight-control.service
 	sudo rm -f /usr/local/bin/backlight-ctl
+	sudo rm -f /usr/local/bin/backlight-config
+	sudo rm -f /usr/local/bin/backlight-control-panel
+	sudo rm -f /usr/local/bin/backlight-status-bar.sh
 	sudo rm -f /usr/share/man/man1/backlight-ctl.1
 	sudo rm -f /etc/udev/rules.d/90-backlight.rules
 	sudo rm -f /etc/sudoers.d/backlight-control
+	rm -f ~/.config/argos/backlight.5s.sh
 	sudo systemctl daemon-reload
 	sudo mandb -q
 	@echo "Uninstall complete"

@@ -5,7 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2024-10-11
+## [1.1.0] - 2025-01-02
+
+### Added
+- Status bar integration with `backlight-status-bar.sh`
+- Complete installation script (`install-complete.sh`) that includes status bar
+- Automatic Argos extension support for GNOME users
+- Release packaging system with `create-release.sh`
+- System-wide status bar script installation
+
+### Changed
+- Updated installation process to include status bar by default
+- Improved Makefile with status bar installation targets
+- Enhanced documentation with status bar usage instructions
+
+### Features
+- Status bar shows ⌨A (auto mode) or ⌨M (manual mode)
+- Click menu with toggle mode, configuration, and status options
+- Compatible with Argos extension and other status bar systems
+- Distributable release packages (.tar.gz and .zip)
+
+## [1.0.0] - 2025-01-02
 
 ### Added
 - Initial release of keyboard backlight control daemon

@@ -14,6 +14,7 @@ debian/
 build-packages.sh
 deb-build/
 rpm-build/
+releases/
 
 # Temporary and cache files
 *.tmp
