@@ -129,7 +129,7 @@ unsigned long get_interrupt_activity() {
     unsigned long total = 0;
     
     while (fgets(line, sizeof(line), f)) {
-        if (strstr(line, "i8042")) {
+        if (strstr(line, "i8042") || strstr(line, "i2c_designware")) {
             char *colon = strchr(line, ':');
             if (colon) {
                 char *ptr = colon + 1;
